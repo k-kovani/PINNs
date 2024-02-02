@@ -1,0 +1,220 @@
+import numpy as np
+
+class pde:
+    def __init__(self):
+
+    
+    # =============================================
+    # 1D Burger's Equation:
+    # =============================================
+    
+    def 1D_Burgers_PDE(model, X_input, viscocity):
+    
+        x = X_input[:, 0:1]
+        t = X_input[:, 1:2]
+      
+        x = tf.convert_to_tensor(x, dtype=tf.float32)
+        t = tf.convert_to_tensor(t, dtype=tf.float32)
+      
+        with tf.GradientTape(persistent=True) as tape2:
+          tape2.watch(x)
+          with tf.GradientTape(persistent=True) as tape1:
+            tape1.watch(x)
+            tape1.watch(t)
+            
+            # calculate model predictions:
+            u = model(tf.concat([x, t], axis=-1), training=True)
+  
+          # compute first derivatives:
+          du_dt = tape1.gradient(u, t)
+          du_dx = tape1.gradient(u, x)
+        
+        # compute sencond derivatives:
+        du_dxx = tape2.gradient(du_dx, x)
+  
+        # compute the PDE residuals:
+        nu = viscocity
+        res = du_dt + u*du_dx - nu * du_dxx
+      
+        del tape2
+        return res
+
+
+    # =============================================
+    # 2D Burger's Equation:
+    # =============================================
+    
+    def 2D_Burgers_PDE(model, X_input, viscocity):
+    
+        x = X_input[:, 0:1]
+        y = X_input[:, 1:2]
+        t = X_input[:, 2:3]
+      
+        x = tf.convert_to_tensor(x, dtype=tf.float32)
+        y = tf.convert_to_tensor(y, dtype=tf.float32)
+        t = tf.convert_to_tensor(t, dtype=tf.float32)
+      
+        with tf.GradientTape(persistent=True) as tape2:
+          tape2.watch(x)
+          tape2.watch(y)
+          with tf.GradientTape(persistent=True) as tape1:
+            tape1.watch(x)
+            tape2.watch(y)
+            tape1.watch(t)
+            
+            # calculate model predictions:
+            u = model(tf.concat([x, y, t], axis=-1), training=True)
+  
+          # compute first derivatives:
+          du_dt = tape1.gradient(u, t)
+          du_dx = tape1.gradient(u, x)
+          du_dy = tape1.gradient(u, y)
+        
+        # compute sencond derivatives:
+        du_dxx = tape2.gradient(du_dx, x)
+        du_dyy = tape2.gradient(du_dy, y)
+  
+        # compute the PDE residuals:
+        nu = viscocity
+        res = du_dt + u * (du_dx + du_dy)  - nu * (du_dxx + du_dyy)
+      
+        del tape2
+        return res
+
+
+    # =============================================
+    # 1D Heat Equation:
+    # =============================================
+    
+    def 1D_Heat_PDE(model, X_input, k_coeff):
+    
+        x = X_input[:, 0:1]
+        t = X_input[:, 1:2]
+      
+        x = tf.convert_to_tensor(x, dtype=tf.float32)
+        t = tf.convert_to_tensor(t, dtype=tf.float32)
+      
+        with tf.GradientTape(persistent=True) as tape2:
+          tape2.watch(x)
+          with tf.GradientTape(persistent=True) as tape1:
+            tape1.watch(x)
+            tape1.watch(t)
+            
+            # calculate model predictions:
+            u = model(tf.concat([x, t], axis=-1), training=True)
+  
+          # compute first derivatives:
+          du_dt = tape1.gradient(u, t)
+          du_dx = tape1.gradient(u, x)
+        
+        # compute sencond derivatives:
+        du_dxx = tape2.gradient(du_dx, x)
+  
+        # compute the PDE residuals:
+        k = k_coeff
+        res = du_dt - k * du_dxx
+      
+        del tape2
+        return res
+
+
+    # =============================================
+    # 2D Heat Equation:
+    # =============================================
+
+    def 2D_Heat_PDE(model, X_input, k_coeff):
+    
+        x = X_input[:, 0:1]
+        y = X_input[:, 1:2]
+        t = X_input[:, 2:3]
+      
+        x = tf.convert_to_tensor(x, dtype=tf.float32)
+        y = tf.convert_to_tensor(y, dtype=tf.float32)
+        t = tf.convert_to_tensor(t, dtype=tf.float32)
+      
+        with tf.GradientTape(persistent=True) as tape2:
+          tape2.watch(x)
+          tape2.watch(y)
+          with tf.GradientTape(persistent=True) as tape1:
+            tape1.watch(x)
+            tape1.watch(y)
+            tape1.watch(t)
+            
+            # calculate model predictions:
+            u = model(tf.concat([x, y, t], axis=-1), training=True)
+  
+          # compute first derivatives:
+          du_dt = tape1.gradient(u, t)
+          du_dx = tape1.gradient(u, x)
+          du_dy = tape1.gradient(u, y)
+        
+        # compute sencond derivatives:
+        du_dxx = tape2.gradient(du_dx, x)
+        du_dyy = tape2.gradient(du_dy, y)
+  
+        # compute the PDE residuals:
+        k = k_coeff
+        res = du_dt - k * (du_dxx + du_dyy)
+      
+        del tape2
+        return res
+
+
+    # =============================================
+    # 2D Navier-Stokes Equations:
+    # =============================================
+    
+    def 2D_Navier_Stokes(model, X_input, C1_coeff, C2_coeff):
+    
+        x = X_input[:, 0:1]
+        y = X_input[:, 1:2]
+        t = X_input[:, 2:3]
+      
+        x = tf.convert_to_tensor(x, dtype=tf.float32)
+        y = tf.convert_to_tensor(y, dtype=tf.float32)
+        t = tf.convert_to_tensor(t, dtype=tf.float32)
+      
+        with tf.GradientTape(persistent=True) as tape2:
+          tape2.watch(x)
+          tape2.watch(y)
+          with tf.GradientTape(persistent=True) as tape1:
+            tape1.watch(x)
+            tape2.watch(y)
+            tape1.watch(t)
+            
+            # calculate model predictions:
+            predictions = model(tf.concat([x, y, t], axis=-1), training=True)
+            u = predictions[:, 0:1]
+            v = predicitons[:, 1:2]
+            p = predictions[:, 2:3]
+  
+          # compute first derivatives:
+          du_dt = tape1.gradient(u, t)
+          dv_dt = tape1.gradient(v, t)
+          du_dx = tape1.gradient(u, x)
+          du_dy = tape1.gradient(u, y)
+          dv_dx = tape1.gradient(v, x)
+          dv_dy = tape1.gradient(v, y)
+          dp_dx = tape1.gradient(p, x)
+          dp_dy = tape1.gradient(p, y)
+        
+        # compute sencond derivatives:
+        du_dxx = tape2.gradient(du_dx, x)
+        du_dyy = tape2.gradient(du_dy, y)
+        dv_dxx = tape2.gradient(dv_dx, x)
+        dv_dyy = tape2.gradient(dv_dy, y)
+  
+        # compute the PDE residuals:
+        C1 = C1_coeff
+        C2 = C2_coeff
+
+        continuity = du_dx + dv_dy
+        momentum_x = du_dt + C1 * (u * du_dx + v * du_dy) + dp_dx - C2 * (du_dxx + du_dyy)
+        momentum_y = du_dt + C1 * (u * dv_dx + v * dv_dy) + dp_dy - C2 * (dv_dxx + dv_dyy)
+        res = [continuity, momentum_x, momentum_y]
+      
+        del tape2
+        return res
+
+
+ 
