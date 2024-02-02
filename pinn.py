@@ -1,7 +1,10 @@
 import numpy as np
-import tensorflow as tf
 import time
-from utilities import Domain, PDE, PINN_function_factory
+import tensorflow as tf
+import tensorflow_probability as tfp
+from utilities import PINN_function_factory, check_model_type, save_model
+from PDE import pde
+from geometries import geom
 
 
 # ==============================================================================================================
@@ -10,7 +13,7 @@ from utilities import Domain, PDE, PINN_function_factory
 
 class PINN:
 
-    def __init__(self, model, optimizer, function_factory, loss, pde, X_domain, Y_domain, X_bc, Y_bc, X_ic, Y_ic):
+    def __init__(self, model, optimizer, PINN_function_factory, loss, pde, X_domain, Y_domain, X_bc, Y_bc, X_ic, Y_ic):
 
       # Instantiate the metric trackers:
       self.loss_tracker= tf.keras.metrics.Mean(name='loss')
@@ -22,7 +25,7 @@ class PINN:
       # Pass the class arguments:
       self.model = model
       self.optimizer = optimizer
-      self.function_factory = function_factory   # Function
+      self.function_factory = PINN_function_factory  # Function
       self.loss_domain, self.loss_bc, self.loss_ic = loss
       self.pde = pde   # Function
       self.X_domain = X_domain
@@ -31,11 +34,13 @@ class PINN:
       self.Y_bc = Y_bc
       self.X_ic = X_ic
       self.Y_ic = Y_ic
+      # compute the number of inputs:
+      self.N_inputs = X_domain.shape[1]
 
   
     # Build & compile the model:
     def prepare_model(self):
-      self.model.build(input_shape=(None,2))
+      self.model.build(input_shape=(None,self.N_inputs))
       self.model.compile()
       return self.model.summary()
 
@@ -92,6 +97,9 @@ class PINN:
     # Train with the defined optimizer:
     def standard_training(self, epochs):
 
+      # Keep record of time:
+      initial_time = time.time()
+
       printing_step = 100
       for i in range(epochs + 1):
 
@@ -107,11 +115,15 @@ class PINN:
                                  self.domain_tracker.result(),
                                  self.bc_tracker.result(),
                                  self.ic_tracker.result()]
-
+        
         # Reset the metrics
         for m in self.metrics:
                 m.reset_states()
-
+      
+      # Print the training time:
+      final_time = time.time()
+      print('\nTotal Computation time: {} seconds\n'.format(round(final_time - initial_time)))
+      
       # Return history:
       HIST = np.array(self.history).reshape((int(epochs/printing_step)+1, len(self.history[0])))
       return HIST
@@ -119,56 +131,75 @@ class PINN:
     
     # Train with the L-BFGS optimizer:
     def lbfgs_training(self):
+        
+        # Check for model compatibility:
+        if check_model_type(self.model) == "Subclassed Model":
+            print("Error! The L-BFGS optimizer in TensorFlow 2.0 is not designed to work with Subclassed models. Please use the Sequential or Functional API.")
+        else:
+            if self.function_factory is None:
+                print("Error: you didn't provide the function factory")
+            else:
+                
+                # Call the function_factory:
+                func = self.function_factory(self.model, self.compute_loss_domain, self.compute_loss_bc, self.compute_loss_ic)
+        
+                # convert initial model parameters to a 1D tf.Tensor
+                init_params = tf.dynamic_stitch(func.idx, self.model.trainable_variables)
 
-        func = self.function_factory(self.model, self.compute_loss_domain, self.compute_loss_bc, self.compute_loss_ic)
+                # Keep record of time:
+                initial_time = time.time()
+                
+                # train the model with L-BFGS solver
+                results = tfp.optimizer.lbfgs_minimize(
+                    value_and_gradients_function=func,
+                    initial_position=init_params,
+                    parallel_iterations=10,     # Parallel iterations
+                    max_iterations=500          # Maximum number of iterations
+                )
 
-        # convert initial model parameters to a 1D tf.Tensor
-        init_params = tf.dynamic_stitch(func.idx, self.model.trainable_variables)
+                # Print the training time:
+                final_time = time.time()
+                print('\nTotal Computation time: {} seconds\n'.format(round(final_time - initial_time)))
+                
+                # after training, the final optimized parameters are still in results.position
+                # Manually put them back to the model
+                func.assign_new_model_parameters(results.position)
 
-        # train the model with L-BFGS solver
-        results = tfp.optimizer.lbfgs_minimize(
-            value_and_gradients_function=func,
-            initial_position=init_params,
-            parallel_iterations=8, # Parallel iterations
-            max_iterations=500 # Maximum number of iterations
-        )
-        # after training, the final optimized parameters are still in results.position
-        # so we have to manually put them back to the model
-        func.assign_new_model_parameters(results.position)
-        loss_lbfgs = np.array(func.history)
-        #self.history = np.concatenate([np.array(self.history), loss_lbfgs], axis=0)
-        print("L-BFGS best loss: {:2.4e}".format(loss_lbfgs[-1, 0]))
+                # Print best loss:
+                loss_lbfgs = np.array(func.history)
+                print("L-BFGS best loss: {:2.4e}".format(loss_lbfgs[-1, 0]))
 
-        epochs = np.arange(len(loss_lbfgs)).reshape((len(loss_lbfgs), 1))
-        history = np.hstack([epochs, np.array(loss_lbfgs)])
-
-        return history.reshape((len(loss_lbfgs), len(loss_lbfgs[0])+1))
+                # Return history:
+                epochs = np.arange(len(loss_lbfgs)).reshape((len(loss_lbfgs), 1))
+                history = np.hstack([epochs, np.array(loss_lbfgs)])
+                HIST = history.reshape((len(loss_lbfgs), len(loss_lbfgs[0])+1))
+                return HIST
 
 
 
     def hybrid_training(self, epochs):
-        import time
-
+        
+        # Keep record of time:
         initial_time = time.time()
-        # Training with adam
-        print(" ====== Training with Adam ==========")
-        history_adam = self.adam_training(epochs)
+        
+        # Training with defined optimizer:
+        print(" ====== Training with optimizer ==========")
+        history_optimizer = self.standard_training(epochs)
 
-        # Training with lbfgs
-        print(" ====== Training with L -BFGS ==========")
+        # Refining with L-BFGS
+        print(" ====== Refining with L-BFGS ==========")
         history_lbfgs = self.lbfgs_training()
-
+        
+        # Print the training time:
         final_time = time.time()
-        print('\nComputation time: {} seconds\n'.format(round(final_time - initial_time)))
+        print('\nTotal Computation time: {} seconds\n'.format(round(final_time - initial_time)))
 
-        total_history = np.vstack([history_adam, history_lbfgs])
+        # Save the model:
+        path = './saved_model'
+        save_model(path)
 
-
-        path = 'gdrive/MyDrive'
-        #os.makedirs(path)
-        self.model.save(f'{path}/saved_model')
-        # Save loss history
-        np.savetxt(f'{path}/total_history.txt', total_history)
+        # Return the history:
+        total_history = [history_optimizer, history_lbfgs]
         return total_history
 
     @property
@@ -179,3 +210,42 @@ class PINN:
         # If you don't implement this property, you have to call
         # `reset_states()` yourself at the time of your choosing.
         return [self.loss_tracker, self.domain_tracker, self.bc_tracker, self.ic_tracker]
+
+
+
+# ==============================================
+#        Example: 1D Burger's Equation 
+# ==============================================
+
+# Create the training data:
+# ---------------------------
+X_domain, Y_domain = geom.
+X_bc, Y_bc = geom.
+X_ic, Y_ic = geom.
+
+# Define the pde:
+# -----------------
+pde = pde.1D_Burgers()
+
+# Define the model:
+# ---------------------------------
+model = tf.keras.models.Sequential()
+model.add(tf.keras.layers.Input(shape=(2,)))
+model.add(tf.keras.layers.Dense(20, "tanh"))
+model.add(tf.keras.layers.Dense(20, "tanh"))
+model.add(tf.keras.layers.Dense(30, "tanh"))
+model.add(tf.keras.layers.Dense(30, "tanh"))
+model.add(tf.keras.layers.Dense(20, "tanh"))
+model.add(tf.keras.layers.Dense(1, "tanh"))
+
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+loss = [tf.keras.losses.MeanSquaredError(), # loss domain
+        tf.keras.losses.MeanSquaredError(), # loss bc
+        tf.keras.losses.MeanSquaredError()] # loss ic
+
+# Instantiate the PINN:
+pinn = PINN(model, optimizer, PINN_function_factory, loss, pde, X_domain, Y_domain, X_bc, Y_bc, X_ic, Y_ic)
+pinn.prepare_model()
+
+# Train the PINN:
+history = pinn.hybrid_training(1000)
