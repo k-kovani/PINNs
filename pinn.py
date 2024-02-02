@@ -13,9 +13,9 @@ from geometries import geom
 
 class PINN:
 
-    def __init__(self, model, optimizer, PINN_function_factory, loss, pde, X_domain, Y_domain, X_bc, Y_bc, X_ic, Y_ic):
+    def __init__(self, model, optimizer, PINN_function_factory, losses, pde, X_domain, Y_domain, X_bc, Y_bc, X_ic, Y_ic):
 
-      # Instantiate the metric trackers:
+      # Initialize the metric trackers:
       self.loss_tracker= tf.keras.metrics.Mean(name='loss')
       self.bc_tracker = tf.keras.metrics.Mean(name="loss_bc")
       self.ic_tracker = tf.keras.metrics.Mean(name="loss_ic")
@@ -26,7 +26,7 @@ class PINN:
       self.model = model
       self.optimizer = optimizer
       self.function_factory = PINN_function_factory  # Function
-      self.loss_domain, self.loss_bc, self.loss_ic = loss
+      self.loss_domain, self.loss_bc, self.loss_ic = losses
       self.pde = pde   # Function
       self.X_domain = X_domain
       self.Y_domain = Y_domain
@@ -36,8 +36,8 @@ class PINN:
       self.Y_ic = Y_ic
       # compute the number of inputs:
       self.N_inputs = X_domain.shape[1]
-
-  
+   
+    
     # Build & compile the model:
     def prepare_model(self):
       self.model.build(input_shape=(None,self.N_inputs))
@@ -97,7 +97,7 @@ class PINN:
     # Train with the defined optimizer:
     def standard_training(self, epochs):
 
-      # Keep record of time:
+      # Keep track of time:
       initial_time = time.time()
 
       printing_step = 100
@@ -124,7 +124,7 @@ class PINN:
       final_time = time.time()
       print('\nTotal Computation time: {} seconds\n'.format(round(final_time - initial_time)))
       
-      # Return history:
+      # Return the history:
       HIST = np.array(self.history).reshape((int(epochs/printing_step)+1, len(self.history[0])))
       return HIST
 
@@ -146,7 +146,7 @@ class PINN:
                 # convert initial model parameters to a 1D tf.Tensor
                 init_params = tf.dynamic_stitch(func.idx, self.model.trainable_variables)
 
-                # Keep record of time:
+                # Keep track of time:
                 initial_time = time.time()
                 
                 # train the model with L-BFGS solver
@@ -169,7 +169,7 @@ class PINN:
                 loss_lbfgs = np.array(func.history)
                 print("L-BFGS best loss: {:2.4e}".format(loss_lbfgs[-1, 0]))
 
-                # Return history:
+                # Return the history:
                 epochs = np.arange(len(loss_lbfgs)).reshape((len(loss_lbfgs), 1))
                 history = np.hstack([epochs, np.array(loss_lbfgs)])
                 HIST = history.reshape((len(loss_lbfgs), len(loss_lbfgs[0])+1))
@@ -179,7 +179,7 @@ class PINN:
 
     def hybrid_training(self, epochs):
         
-        # Keep record of time:
+        # Keep track of time:
         initial_time = time.time()
         
         # Training with defined optimizer:
@@ -239,12 +239,12 @@ model.add(tf.keras.layers.Dense(20, "tanh"))
 model.add(tf.keras.layers.Dense(1, "tanh"))
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-loss = [tf.keras.losses.MeanSquaredError(), # loss domain
-        tf.keras.losses.MeanSquaredError(), # loss bc
-        tf.keras.losses.MeanSquaredError()] # loss ic
+losses = [tf.keras.losses.MeanSquaredError(), # loss domain
+          tf.keras.losses.MeanSquaredError(), # loss bc
+          tf.keras.losses.MeanSquaredError()] # loss ic
 
 # Instantiate the PINN:
-pinn = PINN(model, optimizer, PINN_function_factory, loss, pde, X_domain, Y_domain, X_bc, Y_bc, X_ic, Y_ic)
+pinn = PINN(model, optimizer, PINN_function_factory, losses, pde, X_domain, Y_domain, X_bc, Y_bc, X_ic, Y_ic)
 pinn.prepare_model()
 
 # Train the PINN:
