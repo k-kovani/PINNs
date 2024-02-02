@@ -2,9 +2,12 @@ import numpy as np
 import time
 import tensorflow as tf
 import tensorflow_probability as tfp
-from utilities import PINN_function_factory, check_model_type, save_model
+from pyDOE import lhs
+import random
+import matplotlib.pyplot as plt
+from utilities import IPINN_function_factory, check_model_type, save_model
 from PDEs import pde
-#from geometries import geom
+from custom_domain import Generate_Custom_Domain
 
 
 # ==============================================================================================================
@@ -221,13 +224,21 @@ class IPINN:
 
 # Create the training data:
 # ---------------------------
-X_domain, Y_domain = geom.
-X_solution = np.load('./X_sol_data.npy')
-Y_solution = np.load('./Y_sol_data.npy')
+data = Generate_Custom_Domain(num_domain=200,
+                              num_bc=20,
+                              num_ic=40,
+                              sampling_method='lhs',
+                              Xmin=[-1, 0],
+                              Xmax=[1, 1]
+                              )
+X_domain, Y_domain = data.generate_domain()
+X_bc, Y_bc = data.generate_bc()
+X_ic, Y_ic = data.generate_ic()
+
 
 # Define the pde:
 # -----------------
-pde = pde.1D_Burgers()
+pde = pde().Burgers_1D
 lambda_value = 2.0    # Solution's (true) viscosity = 0.2
 
 # Define the model:
