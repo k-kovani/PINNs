@@ -224,9 +224,9 @@ class IPINN:
 
 # Create the training data:
 # ---------------------------
-data = Generate_Custom_Domain(num_domain=200,
-                              num_bc=20,
-                              num_ic=40,
+data = Generate_Custom_Domain(num_domain=500,
+                              num_bc=40,
+                              num_ic=80,
                               sampling_method='lhs',
                               Xmin=[-1, 0],
                               Xmax=[1, 1]
