@@ -1,2 +1,2 @@
 # PINNs
-Physics-Informed Neural Networks Codes
+Physics-Informed Neural Networks
