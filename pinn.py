@@ -2,9 +2,13 @@ import numpy as np
 import time
 import tensorflow as tf
 import tensorflow_probability as tfp
+from pyDOE import lhs
+import random
+import matplotlib.pyplot as plt
 from utilities import PINN_function_factory, check_model_type, save_model
 from PDEs import pde
-#from GeomDomains import 
+from custom_domain import Generate_Custom_Domain
+
 
 
 # ==============================================================================================================
@@ -219,13 +223,21 @@ class PINN:
 
 # Create the training data:
 # ---------------------------
-X_domain, Y_domain = geom.
-X_bc, Y_bc = geom.
-X_ic, Y_ic = geom.
+data = Generate_Custom_Domain(num_domain=200,
+                              num_bc=20,
+                              num_ic=40,
+                              sampling_method='lhs',
+                              Xmin=[-1, 0],
+                              Xmax=[1, 1]
+                              )
+X_domain, Y_domain = data.generate_domain()
+X_bc, Y_bc = data.generate_bc()
+X_ic, Y_ic = data.generate_ic()
+
 
 # Define the pde:
 # -----------------
-pde = pde.1D_Burgers()
+pde = pde().Burgers_1D
 
 # Define the model:
 # ---------------------------------
