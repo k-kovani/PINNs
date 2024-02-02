@@ -3,8 +3,8 @@ import time
 import tensorflow as tf
 import tensorflow_probability as tfp
 from utilities import PINN_function_factory, check_model_type, save_model
-from PDE import pde
-from geometries import geom
+from PDEs import pde
+#from GeomDomains import 
 
 
 # ==============================================================================================================
