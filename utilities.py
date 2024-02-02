@@ -216,18 +216,25 @@ def IPINN_function_factory(model, loss_domain, loss_solution, lambda_value):
         return f
 
 
-    # =====================================
-    # Function that checks the model type:
-    # =====================================
-    def check_model_type(model):
+# =====================================
+# Function that checks the model type:
+# =====================================
+def check_model_type(model):
 
-        if isinstance(model, tf.keras.models.Sequential):
-            return "Sequential API"
-        elif isinstance(model, tf.keras.Model):
-            # Check if the model has custom layers (indicating model subclassing)
-            if any(isinstance(layer, tf.keras.layers.Layer) for layer in model.layers):
-                return "Subclassed Model"
-            else:
-                return "Functional API"
+    if isinstance(model, tf.keras.models.Sequential):
+        return "Sequential API"
+    elif isinstance(model, tf.keras.Model):
+        # Check if the model has custom layers (indicating model subclassing)
+        if any(isinstance(layer, tf.keras.layers.Layer) for layer in model.layers):
+            return "Subclassed Model"
         else:
-            return "Unknown"
+            return "Functional API"
+    else:
+        return "Unknown"
+
+
+def save_model(path):
+    
+    # Save the model
+    self.model.save(path)
+    return None
